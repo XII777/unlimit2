@@ -134,7 +134,7 @@ final todaysSessionsProvider = StreamProvider((ref) {
 
 /// The currently-active (in-progress) focus session, if any — drives the
 /// Focus screen's ring from a real DB row instead of local state.
-final activeSessionProvider = StreamProvider<FocusSessions?>((ref) {
+final activeSessionProvider = StreamProvider((ref) {
   final db = ref.watch(databaseProvider);
   final query = db.select(db.focusSessions)
     ..where((t) => t.completed.equals(false) & t.endedAt.isNull())
@@ -374,7 +374,7 @@ final blockedAppsCountProvider = StreamProvider<int>((ref) {
 
 /// Full list of all blocked apps (enabled or not) — drives the Blocked
 /// Apps management UI.
-final blockedAppsProvider = StreamProvider<List<BlockedAppsData>>((ref) {
+final blockedAppsProvider = StreamProvider((ref) {
   final db = ref.watch(databaseProvider);
   final query = db.select(db.blockedApps)..orderBy([(t) => OrderingTerm.asc(t.packageName)]);
   return query.watch();
@@ -386,10 +386,10 @@ final blockedAppsProvider = StreamProvider<List<BlockedAppsData>>((ref) {
 final blocklistSyncProvider = Provider((ref) {
   final apps = ref.watch(blockedAppsProvider);
   final data = apps.valueOrNull;
-  if (data != null) {
+  if (data != null && data.isNotEmpty) {
     final enabled = data.where((a) => a.enabled).map((a) => a.packageName).toList();
     NativeBlocklist.syncBlocklist(enabled, data.any((a) => a.enabled));
-  });
+  }
   return data;
 });
 

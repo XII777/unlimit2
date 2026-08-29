@@ -4,6 +4,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/native/permissions_channel.dart';
 import '../../data/permissions_providers.dart';
 import '../../data/home_data_providers.dart';
+import '../../data/providers.dart';
 
 class ParentalScreen extends ConsumerStatefulWidget {
   const ParentalScreen({super.key});
@@ -131,26 +132,26 @@ class _ParentalScreenState extends ConsumerState<ParentalScreen> with WidgetsBin
                       value: enabled,
                       onChanged: (v) => _toggleBiometricLock(context, v, available),
                     ),
-                    loading: () => const _ToggleRow(
+                    loading: () => _ToggleRow(
                       label: 'Require biometric to edit',
                       sublabel: 'Loading…',
                       value: false,
                       onChanged: (_) {},
                     ),
-                    error: (_, __) => const _ToggleRow(
+                    error: (_, __) => _ToggleRow(
                       label: 'Require biometric to edit',
                       sublabel: 'Error loading',
                       value: false,
                       onChanged: (_) {},
                     ),
                   ),
-                  loading: () => const _ToggleRow(
+                  loading: () => _ToggleRow(
                     label: 'Require biometric to edit',
                     sublabel: 'Checking availability…',
                     value: false,
                     onChanged: (_) {},
                   ),
-                  error: (_, __) => const _ToggleRow(
+                  error: (_, __) => _ToggleRow(
                     label: 'Require biometric to edit',
                     sublabel: 'Not available',
                     value: false,
