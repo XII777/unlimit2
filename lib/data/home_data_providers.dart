@@ -7,7 +7,7 @@ DateTime _daysAgo(int n) => _startOfDay(DateTime.now().subtract(Duration(days: n
 
 /// The singleton Profile row — display name, photo, theme, budget, and
 /// biometric lock setting. Null until first write creates it.
-final profileProvider = StreamProvider<ProfileData?>((ref) {
+final profileProvider = StreamProvider((ref) {
   final db = ref.watch(databaseProvider);
   final query = db.select(db.profile)..limit(1);
   return query.watch().map((rows) => rows.isEmpty ? null : rows.first);

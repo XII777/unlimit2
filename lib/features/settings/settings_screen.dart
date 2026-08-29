@@ -27,7 +27,7 @@ class SettingsScreen extends ConsumerWidget {
           _Card(
             children: [
               profile.when(
-                data: (p) => _ProfileRow(
+                data: (dynamic p) => _ProfileRow(
                   displayName: p?.displayName ?? 'You',
                   budgetMinutes: p?.dailyBudgetMinutes ?? 240,
                 ),

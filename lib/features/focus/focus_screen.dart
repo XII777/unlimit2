@@ -23,9 +23,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       final active = ref.read(activeSessionProvider).valueOrNull;
       if (active == null) return;
-      final startedAt = active.startedAt;
-      if (startedAt == null) return;
-      setState(() => _elapsed = DateTime.now().difference(startedAt));
+      setState(() => _elapsed = DateTime.now().difference(active.startedAt));
     });
   }
 
@@ -42,7 +40,7 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
     final sessions = ref.watch(todaysSessionsProvider);
     final completedCount = sessions.valueOrNull?.length ?? 0;
     final active = activeSession.valueOrNull;
-    final plannedSeconds = (active?.plannedSeconds as int?) ?? (25 * 60);
+    final plannedSeconds = active?.plannedSeconds ?? (25 * 60);
     final totalPlanned = Duration(seconds: plannedSeconds);
     final remaining = totalPlanned - _elapsed;
     final isSessionActive = active != null;
