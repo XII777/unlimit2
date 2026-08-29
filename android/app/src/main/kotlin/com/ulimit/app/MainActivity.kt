@@ -1,7 +1,6 @@
 package com.ulimit.app
 
-import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
@@ -9,8 +8,10 @@ import android.os.Build
 import android.provider.Settings
 import android.text.TextUtils
 import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -91,6 +92,14 @@ class MainActivity : FlutterActivity() {
                         startActivity(intent)
                         result.success(null)
                     }
+                    "setDndEnabled" -> {
+                        val enabled = call.argument<Boolean>("enabled") ?: false
+                        result.success(setDndMode(enabled))
+                    }
+                    "isDndEnabled" -> {
+                        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        result.success(nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -158,5 +167,19 @@ class MainActivity : FlutterActivity() {
         val biometricManager = BiometricManager.from(this)
         return biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
             BiometricManager.BIOMETRIC_SUCCESS
+    }
+
+    /// Sets Do Not Disturb mode on/off. Requires ACCESS_NOTIFICATION_POLICY
+    /// permission (granted via Settings during onboarding). Returns true
+    /// if the change was applied, false if permission is missing.
+    private fun setDndMode(enabled: Boolean): Boolean {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (!nm.isNotificationPolicyAccessGranted) return false
+        nm.interruptionFilter = if (enabled) {
+            NotificationManager.INTERRUPTION_FILTER_PRIORITY
+        } else {
+            NotificationManager.INTERRUPTION_FILTER_ALL
+        }
+        return true
     }
 }

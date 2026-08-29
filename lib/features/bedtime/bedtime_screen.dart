@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/native/permissions_channel.dart';
 import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
 
@@ -84,7 +85,16 @@ class BedtimeScreen extends ConsumerWidget {
                 label: 'Do Not Disturb',
                 subtitle: 'Silence calls & notifications',
                 value: dnd,
-                onChanged: (v) => db.setDndEnabled(v),
+                onChanged: (v) async {
+                  final success = await NativePermissions.setDndEnabled(v);
+                  if (success) {
+                    await db.setDndEnabled(v);
+                  } else {
+                    // Permission not granted — open settings so the user
+                    // can grant ACCESS_NOTIFICATION_POLICY.
+                    await NativePermissions.openNotificationListenerSettings();
+                  }
+                },
               ),
               const Divider(height: 1, color: AppColors.stroke),
               _ToggleRow(

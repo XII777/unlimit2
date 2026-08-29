@@ -50,4 +50,15 @@ class NativePermissions {
   static Future<bool> isBiometricAvailable() async {
     return await _channel.invokeMethod<bool>('isBiometricAvailable') ?? false;
   }
+
+  /// Sets Do Not Disturb mode on/off. Returns true if applied, false if
+  /// ACCESS_NOTIFICATION_POLICY permission hasn't been granted yet.
+  static Future<bool> setDndEnabled(bool enabled) async {
+    return await _channel.invokeMethod<bool>('setDndEnabled', {'enabled': enabled}) ?? false;
+  }
+
+  /// Checks whether DND is currently active (interruption filter != ALL).
+  static Future<bool> isDndEnabled() async {
+    return await _channel.invokeMethod<bool>('isDndEnabled') ?? false;
+  }
 }
