@@ -46,9 +46,9 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final todaysSessions = ref.watch(todaysSessionsProvider);
-    final completedCount = todaysSessions.valueOrNull?.length ?? 0;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessions = ref.watch(todaysSessionsProvider);
+    final completedCount = sessions.valueOrNull?.length ?? 0;
     final progress = _sessionActive ? 1 - (_remaining.inSeconds / _totalPlanned.inSeconds) : 0.0;
 
     return Container(
@@ -174,9 +174,6 @@ class _TodaysSessions extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessions = ref.watch(todaysSessionsProvider);
-    final total = 3; // planned sessions per day
-
     return Column(
       children: [
         Text(
@@ -188,7 +185,7 @@ class _TodaysSessions extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            for (var i = 0; i < total; i++) ...[
+            for (var i = 0; i < 3; i++) ...[
               if (i > 0) const SizedBox(width: 6),
               _SessionDot(state: i < completed
                   ? _SessionState.done

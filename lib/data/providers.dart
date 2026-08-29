@@ -117,7 +117,7 @@ final todaysCompletedSessionsProvider = StreamProvider<int>((ref) {
 
 /// Today's completed focus sessions as a live list — drives the Focus
 /// screen's session dots from real data instead of a hardcoded count.
-final todaysSessionsProvider = StreamProvider<List<FocusSessionsData>>((ref) {
+final todaysSessionsProvider = StreamProvider((ref) {
   final db = ref.watch(databaseProvider);
   final start = _startOfDay(DateTime.now());
   final end = start.add(const Duration(days: 1));
