@@ -1,6 +1,6 @@
-import 'package:mulimited/core/services/drift_db_service.dart';
-import 'package:mulimited/core/services/method_channel_service.dart';
-import 'package:mulimited/data/providers.dart';
+import 'core/services/drift_db_service.dart';
+import 'core/services/method_channel_service.dart';
+import 'data/providers.dart';
 
 /// Boot-time initializer.
 ///
