@@ -14,21 +14,16 @@ class FocusScreen extends ConsumerStatefulWidget {
 }
 
 class _FocusScreenState extends ConsumerState<FocusScreen> {
-  static const _totalPlanned = Duration(minutes: 25);
-  Duration _remaining = _totalPlanned;
   Timer? _ticker;
-  bool _sessionActive = false;
+  Duration _elapsed = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!_sessionActive || _remaining.inSeconds <= 0) return;
-      setState(() => _remaining -= const Duration(seconds: 1));
-      if (_remaining.inSeconds <= 0) {
-        _sessionActive = false;
-        _ticker?.cancel();
-      }
+      final active = ref.read(activeSessionProvider).valueOrNull;
+      if (active == null) return;
+      setState(() => _elapsed = DateTime.now().difference(active.startedAt));
     });
   }
 
@@ -38,19 +33,20 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
     super.dispose();
   }
 
-  void _startSession() {
-    setState(() {
-      _sessionActive = true;
-      _remaining = _totalPlanned;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final ref = this.ref;
+    final activeSession = ref.watch(activeSessionProvider);
     final sessions = ref.watch(todaysSessionsProvider);
     final completedCount = sessions.valueOrNull?.length ?? 0;
-    final progress = _sessionActive ? 1 - (_remaining.inSeconds / _totalPlanned.inSeconds) : 0.0;
+    final active = activeSession.valueOrNull;
+    final plannedSeconds = active?.plannedSeconds ?? (25 * 60);
+    final totalPlanned = Duration(seconds: plannedSeconds);
+    final remaining = totalPlanned - _elapsed;
+    final isSessionActive = active != null;
+    final progress = isSessionActive
+        ? (remaining.inSeconds / totalPlanned.inSeconds).clamp(0.0, 1.0)
+        : 0.0;
 
     return Container(
       decoration: const BoxDecoration(
@@ -73,13 +69,17 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(_format(_remaining), style: GoogleFonts.spaceGrotesk(
-                    fontSize: 38,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.ink,
-                  )),
+                  Text(_format(remaining.isNegative ? Duration.zero : remaining),
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 38,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink,
+                      )),
                   const SizedBox(height: 6),
-                  Text(_sessionActive ? 'Deep Work · remaining' : 'Ready to focus',
+                  Text(
+                      isSessionActive
+                          ? '${active.label} · remaining'
+                          : 'Ready to focus',
                       style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
@@ -94,15 +94,18 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: _sessionActive ? () => _confirmEndEarly(context) : _startSession,
+                  onPressed: isSessionActive
+                      ? () => _confirmEndEarly(context)
+                      : () => _startSession(context),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.all(14),
                     backgroundColor: AppColors.surface2,
                     side: const BorderSide(color: AppColors.stroke),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.md)),
                   ),
                   child: Text(
-                    _sessionActive ? 'End session early' : 'Start session',
+                    isSessionActive ? 'End session early' : 'Start session',
                     style: const TextStyle(color: AppColors.inkDim),
                   ),
                 ),
@@ -120,11 +123,71 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
     return '$m:$s';
   }
 
+  void _startSession(BuildContext context) {
+    final db = ref.read(databaseProvider);
+    db.startFocusSession(
+      label: 'Deep Work',
+      plannedSeconds: 25 * 60,
+      invincible: false,
+    );
+  }
+
   void _confirmEndEarly(BuildContext context) {
+    final db = ref.read(databaseProvider);
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
-      builder: (_) => const SizedBox(height: 160, child: Center(child: Text('Confirm sheet — wire to session provider'))),
+      builder: (_) => _EndSessionSheet(
+        onEnd: () => db.abandonActiveSession(),
+        onComplete: () => db.completeActiveSession(),
+      ),
+    );
+  }
+}
+
+class _EndSessionSheet extends StatelessWidget {
+  const _EndSessionSheet({required this.onEnd, required this.onComplete});
+  final VoidCallback onEnd;
+  final VoidCallback onComplete;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 180,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('End session?',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      onEnd();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Discard'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      onComplete();
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Complete'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -146,7 +209,8 @@ class _InvincibleChip extends StatelessWidget {
         children: [
           Icon(Icons.lock_rounded, size: 12, color: AppColors.accentSoft),
           SizedBox(width: 6),
-          Text('Invincible mode on', style: TextStyle(fontSize: 11.5, color: AppColors.accentSoft)),
+          Text('Invincible mode on',
+              style: TextStyle(fontSize: 11.5, color: AppColors.accentSoft)),
         ],
       ),
     );
@@ -163,18 +227,19 @@ class _LockNote extends StatelessWidget {
       children: [
         const Icon(Icons.notifications_off_rounded, size: 13, color: AppColors.inkFaint),
         const SizedBox(width: 6),
-        Text('12 apps paused · DND on', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.5)),
+        Text('12 apps paused · DND on',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11.5)),
       ],
     );
   }
 }
 
-class _TodaysSessions extends ConsumerWidget {
+class _TodaysSessions extends StatelessWidget {
   const _TodaysSessions({required this.completed});
   final int completed;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Column(
       children: [
         Text(

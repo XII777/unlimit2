@@ -130,6 +130,131 @@ final todaysSessionsProvider = StreamProvider((ref) {
   return query.watch();
 });
 
+/// The currently-active (in-progress) focus session, if any — drives the
+/// Focus screen's ring from a real DB row instead of local state.
+final activeSessionProvider = StreamProvider<FocusSessions?>((ref) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.focusSessions)
+    ..where((t) => t.completed.equals(false) & t.endedAt.isNull())
+    ..limit(1);
+  return query.watchSingleOrNull();
+});
+
+/// Focus session actions — start, complete, abandon. Each writes a real
+/// row so history survives app restarts and feeds todaysSessionsProvider.
+extension FocusSessionActions on AppDatabase {
+  Future<void> startFocusSession({
+    required String label,
+    required int plannedSeconds,
+    bool invincible = false,
+  }) async {
+    await into(focusSessions).insert(FocusSessionsCompanion.insert(
+      label: label,
+      startedAt: DateTime.now(),
+      plannedSeconds: plannedSeconds,
+      invincible: Value(invincible),
+    ));
+  }
+
+  Future<void> completeActiveSession() async {
+    final active = await (select(focusSessions)
+          ..where((t) => t.completed.equals(false) & t.endedAt.isNull())
+          ..limit(1))
+        .getSingleOrNull();
+    if (active == null) return;
+    await (update(focusSessions)..where((t) => t.id.equals(active.id)))
+        .write(FocusSessionsCompanion(
+          endedAt: Value(DateTime.now()),
+          completed: const Value(true),
+        ));
+  }
+
+  Future<void> abandonActiveSession() async {
+    final active = await (select(focusSessions)
+          ..where((t) => t.completed.equals(false) & t.endedAt.isNull())
+          ..limit(1))
+        .getSingleOrNull();
+    if (active == null) return;
+    await (update(focusSessions)..where((t) => t.id.equals(active.id)))
+        .write(FocusSessionsCompanion(
+          endedAt: Value(DateTime.now()),
+          completed: const Value(false),
+        ));
+  }
+}
+
+/// Restriction group + blocked apps management. These write real rows
+/// that the enforcement layer (AccessibilityService overlay) reads from.
+extension RestrictionActions on AppDatabase {
+  Future<void> addRestrictionGroup({
+    required String name,
+    required int dailyLimitSeconds,
+    bool invincible = false,
+  }) async {
+    await into(restrictionGroups).insert(RestrictionGroupsCompanion.insert(
+      name: name,
+      dailyLimitSeconds: dailyLimitSeconds,
+      invincible: Value(invincible),
+    ));
+  }
+
+  Future<void> updateRestrictionGroup(
+    int id, {
+    String? name,
+    int? dailyLimitSeconds,
+    bool? invincible,
+  }) async {
+    await (update(restrictionGroups)..where((t) => t.id.equals(id)))
+        .write(RestrictionGroupsCompanion(
+      name: name != null ? Value(name) : const Value.absent(),
+      dailyLimitSeconds: dailyLimitSeconds != null ? Value(dailyLimitSeconds) : const Value.absent(),
+      invincible: invincible != null ? Value(invincible) : const Value.absent(),
+    ));
+  }
+
+  Future<void> deleteRestrictionGroup(int id) async {
+    await (delete(restrictionGroupApps)..where((t) => t.groupId.equals(id))).go();
+    await (delete(restrictionGroups)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<void> addAppToGroup(int groupId, String packageName) async {
+    await into(restrictionGroupApps).insert(
+      RestrictionGroupAppsCompanion.insert(groupId: groupId, packageName: packageName),
+      mode: InsertMode.insertOrIgnore,
+    );
+  }
+
+  Future<void> removeAppFromGroup(int groupId, String packageName) async {
+    await (delete(restrictionGroupApps)
+          ..where((t) => t.groupId.equals(groupId) & t.packageName.equals(packageName)))
+        .go();
+  }
+
+  Future<void> addBlockedApp({
+    required String packageName,
+    String? scheduleStart,
+    String? scheduleEnd,
+  }) async {
+    await into(blockedApps).insert(
+      BlockedAppsCompanion.insert(
+        packageName: packageName,
+        scheduleStart: Value(scheduleStart),
+        scheduleEnd: Value(scheduleEnd),
+      ),
+      mode: InsertMode.insertOrReplace,
+    );
+  }
+
+  Future<void> setBlockedAppEnabled(String packageName, bool enabled) async {
+    await (update(blockedApps)..where((t) => t.packageName.equals(packageName)))
+        .write(BlockedAppsCompanion(enabled: Value(enabled)));
+  }
+
+  Future<void> removeBlockedApp(String packageName) async {
+    await (delete(blockedApps)..where((t) => t.packageName.equals(packageName))).go();
+  }
+}
+
 /// Turns a stream of (day, seconds) rows into a fixed 7-slot list
 /// starting at [start], zero-filling any day with no rows. Shared by
 /// both weekly providers above so "bucket into a 7-day window" is
@@ -234,6 +359,45 @@ final blockedAppsCountProvider = StreamProvider<int>((ref) {
   final query = db.select(db.blockedApps)..where((t) => t.enabled.equals(true));
   return query.watch().map((rows) => rows.length);
 });
+
+/// Full list of all blocked apps (enabled or not) — drives the Blocked
+/// Apps management UI.
+final blockedAppsProvider = StreamProvider<List<BlockedAppsData>>((ref) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.blockedApps)..orderBy([(t) => OrderingTerm.asc(t.packageName)]);
+  return query.watch();
+});
+
+/// All installed apps that aren't already in a given restriction group —
+/// drives the "add app to group" picker. Queried via PackageManager on
+/// native side, passed back through MethodChannel.
+final installedAppsProvider = FutureProvider<List<InstalledApp>>((ref) {
+  return _fetchInstalledApps();
+});
+
+class InstalledApp {
+  const InstalledApp({required this.packageName, required this.label});
+  final String packageName;
+  final String label;
+}
+
+Future<List<InstalledApp>> _fetchInstalledApps() async {
+  // Placeholder — real implementation calls native PackageManager
+  // via MethodChannel. Returns common social/media apps as defaults
+  // so the picker has data even before native wiring lands.
+  return const [
+    InstalledApp(packageName: 'com.instagram.android', label: 'Instagram'),
+    InstalledApp(packageName: 'com.zhiliaoapp.musically', label: 'TikTok'),
+    InstalledApp(packageName: 'com.twitter.android', label: 'X (Twitter)'),
+    InstalledApp(packageName: 'com.google.android.youtube', label: 'YouTube'),
+    InstalledApp(packageName: 'com.netflix.mediaclient', label: 'Netflix'),
+    InstalledApp(packageName: 'com.snapchat.android', label: 'Snapchat'),
+    InstalledApp(packageName: 'com.facebook.katana', label: 'Facebook'),
+    InstalledApp(packageName: 'com.discord', label: 'Discord'),
+    InstalledApp(packageName: 'com.reddit.frontpage', label: 'Reddit'),
+    InstalledApp(packageName: 'com.pinterest', label: 'Pinterest'),
+  ];
+}
 
 /// The single [BedtimeSchedule] row (singleton, like [Profile]) — null
 /// until the first toggle write creates it.
