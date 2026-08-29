@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 /// One local profile row (singleton — no accounts). Display name, photo
 /// path, and theme preference for the share card / settings.
+@DataClassName('ProfileData')
 class Profile extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get displayName => text().withDefault(const Constant('You'))();
@@ -18,6 +19,7 @@ class Profile extends Table {
   BoolColumn get biometricLockEnabled => boolean().withDefault(const Constant(false))();
 }
 
+@DataClassName('FocusSession')
 class FocusSessions extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get label => text()(); // "Deep Work", "Study"...
@@ -32,6 +34,7 @@ class FocusSessions extends Table {
 /// weekly/monthly views rather than maintaining separate rollup tables —
 /// at this data volume (a few hundred rows/month/device) a SUM query is
 /// cheaper than the bookkeeping a materialized rollup would need.
+@DataClassName('AppUsage')
 class AppUsage extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get packageName => text()();
@@ -44,6 +47,7 @@ class AppUsage extends Table {
       ];
 }
 
+@DataClassName('RestrictionGroup')
 class RestrictionGroups extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
@@ -51,6 +55,7 @@ class RestrictionGroups extends Table {
   BoolColumn get invincible => boolean().withDefault(const Constant(false))();
 }
 
+@DataClassName('RestrictionGroupApp')
 class RestrictionGroupApps extends Table {
   IntColumn get groupId => integer().references(RestrictionGroups, #id)();
   TextColumn get packageName => text()();
@@ -59,6 +64,7 @@ class RestrictionGroupApps extends Table {
   Set<Column> get primaryKey => {groupId, packageName};
 }
 
+@DataClassName('BlockedApp')
 class BlockedApps extends Table {
   TextColumn get packageName => text()();
   TextColumn get scheduleStart => text().nullable()(); // "HH:mm" or null = all day
@@ -69,6 +75,7 @@ class BlockedApps extends Table {
   Set<Column> get primaryKey => {packageName};
 }
 
+@DataClassName('BedtimeSchedule')
 class BedtimeSchedule extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get startTime => text()(); // "22:30"
@@ -81,6 +88,7 @@ class BedtimeSchedule extends Table {
 /// Daily snapshot of the Limit score components, so the score is
 /// recomputable/auditable rather than a single mutated integer —
 /// important once "decay" or recalculation logic changes later.
+@DataClassName('ScoreLog')
 class ScoreLog extends Table {
   IntColumn get id => integer().autoIncrement()();
   DateTimeColumn get day => dateTime()();
@@ -91,6 +99,7 @@ class ScoreLog extends Table {
   IntColumn get totalScore => integer()();
 }
 
+@DataClassName('EmergencyUnlock')
 class EmergencyUnlocks extends Table {
   IntColumn get id => integer().autoIncrement()();
   DateTimeColumn get usedAt => dateTime()();
@@ -104,6 +113,7 @@ class EmergencyUnlocks extends Table {
 /// signal would need ACTION_USER_PRESENT from a separate BroadcastReceiver,
 /// which is a reasonable v2 addition), but every foreground switch is a
 /// real, on-device event, not a guess.
+@DataClassName('PickupsLog')
 class PickupsLog extends Table {
   DateTimeColumn get day => dateTime()(); // truncated to midnight
 

@@ -1,13 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/router/app_router.dart';
+import 'core/services/drift_db_service.dart';
+import 'core/services/method_channel_service.dart';
 import 'core/theme/app_theme.dart';
 import 'data/permissions_providers.dart';
 import 'data/providers.dart';
 import 'data/usage_tracker.dart';
 import 'features/onboarding/permissions_screen.dart';
+import 'initializer.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize services
+  await DriftDbService.instance.init();
+  await MethodChannelService.instance.init();
+
+  // Sync persisted state to native services
+  await Initializer.syncToNative();
+
   runApp(const ProviderScope(child: UlimitApp()));
 }
 

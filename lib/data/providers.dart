@@ -1,17 +1,16 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/native/blocklist_channel.dart';
-import '../core/native/permissions_channel.dart';
+import '../core/services/drift_db_service.dart';
 import 'db/app_database.dart';
 import 'db/tables.dart';
 
-/// Single DB instance for the app's lifetime. `keepAlive` so switching
-/// tabs doesn't tear down and reopen the SQLite connection — that
-/// reopen cost is exactly the kind of jank a "don't make it lag"
-/// requirement is about.
+/// Single DB instance for the app's lifetime, backed by [DriftDbService].
+/// `keepAlive` so switching tabs doesn't tear down and reopen the SQLite
+/// connection — that reopen cost is exactly the kind of jank a "don't make
+/// it lag" requirement is about.
 final databaseProvider = Provider<AppDatabase>((ref) {
-  final db = AppDatabase();
-  ref.onDispose(db.close);
+  final db = DriftDbService.instance.db;
+  ref.onDispose(() => db.close());
   return db;
 });
 

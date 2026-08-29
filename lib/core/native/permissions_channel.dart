@@ -1,4 +1,4 @@
-import 'package:flutter/services.dart';
+import '../services/method_channel_service.dart';
 
 /// Thin wrapper around the native MethodChannel. Every method here maps
 /// 1:1 to a `when` branch in MainActivity.kt's onMethodCall — keep them
@@ -12,68 +12,49 @@ import 'package:flutter/services.dart';
 /// request methods trigger one directly.
 class NativePermissions {
   NativePermissions._();
-  static const _channel = MethodChannel('com.ulimit.app/permissions');
 
-  static Future<bool> isAccessibilityEnabled() async {
-    return await _channel.invokeMethod<bool>('isAccessibilityEnabled') ?? false;
-  }
+  static Future<bool> isAccessibilityEnabled() async =>
+      MethodChannelService.instance.isAccessibilityEnabled();
 
   static Future<void> openAccessibilitySettings() =>
-      _channel.invokeMethod('openAccessibilitySettings');
+      MethodChannelService.instance.openAccessibilitySettings();
 
-  static Future<bool> isDeviceAdminActive() async {
-    return await _channel.invokeMethod<bool>('isDeviceAdminActive') ?? false;
-  }
+  static Future<bool> isDeviceAdminActive() async =>
+      MethodChannelService.instance.isDeviceAdminActive();
 
-  static Future<void> requestDeviceAdmin() => _channel.invokeMethod('requestDeviceAdmin');
+  static Future<void> requestDeviceAdmin() =>
+      MethodChannelService.instance.requestDeviceAdmin();
 
-  static Future<bool> isNotificationListenerEnabled() async {
-    return await _channel.invokeMethod<bool>('isNotificationListenerEnabled') ?? false;
-  }
+  static Future<bool> isNotificationListenerEnabled() async =>
+      MethodChannelService.instance.isNotificationListenerEnabled();
 
   static Future<void> openNotificationListenerSettings() =>
-      _channel.invokeMethod('openNotificationListenerSettings');
+      MethodChannelService.instance.openNotificationListenerSettings();
 
-  static Future<bool> hasVpnPermission() async {
-    return await _channel.invokeMethod<bool>('hasVpnPermission') ?? false;
-  }
+  static Future<bool> hasVpnPermission() async =>
+      MethodChannelService.instance.hasVpnPermission();
 
-  static Future<void> requestVpnPermission() => _channel.invokeMethod('requestVpnPermission');
+  static Future<void> requestVpnPermission() =>
+      MethodChannelService.instance.requestVpnPermission();
 
-  static Future<bool> isPostNotificationsGranted() async {
-    return await _channel.invokeMethod<bool>('isPostNotificationsGranted') ?? false;
-  }
+  static Future<bool> isPostNotificationsGranted() async =>
+      MethodChannelService.instance.isPostNotificationsGranted();
 
   static Future<void> requestPostNotifications() =>
-      _channel.invokeMethod('requestPostNotifications');
+      MethodChannelService.instance.requestPostNotifications();
 
-  static Future<bool> isBiometricAvailable() async {
-    return await _channel.invokeMethod<bool>('isBiometricAvailable') ?? false;
-  }
+  static Future<bool> isBiometricAvailable() async =>
+      MethodChannelService.instance.isBiometricAvailable();
 
-  /// Sets Do Not Disturb mode on/off. Returns true if applied, false if
-  /// ACCESS_NOTIFICATION_POLICY permission hasn't been granted yet.
-  static Future<bool> setDndEnabled(bool enabled) async {
-    return await _channel.invokeMethod<bool>('setDndEnabled', {'enabled': enabled}) ?? false;
-  }
+  static Future<bool> isDndEnabled() async =>
+      MethodChannelService.instance.isDndEnabled();
 
-  /// Checks whether DND is currently active (interruption filter != ALL).
-  static Future<bool> isDndEnabled() async {
-    return await _channel.invokeMethod<bool>('isDndEnabled') ?? false;
-  }
+  static Future<bool> setDndEnabled(bool enabled) async =>
+      MethodChannelService.instance.setDndEnabled(enabled);
 
-  /// Shows the system biometric prompt. Returns true if the user
-  /// authenticates successfully. Used to gate parental-control changes.
-  static Future<bool> authenticateBiometric({String reason = "Verify it's you"}) async {
-    return await _channel.invokeMethod<bool>('authenticateBiometric', {'reason': reason}) ?? false;
-  }
+  static Future<bool> authenticateBiometric({String reason = "Verify it's you"}) async =>
+      MethodChannelService.instance.authenticateBiometric(reason: reason);
 
-  /// Enables/disables notification batching. When enabled, the
-  /// NotificationListenerService cancels non-priority notifications.
-  /// [reason] is "focus" or "bedtime" — affects which summary the UI shows.
-  static Future<void> setNotificationBatching(bool enabled, {String reason = "focus"}) =>
-      _channel.invokeMethod('setNotificationBatching', {
-        'enabled': enabled,
-        'reason': reason,
-      });
+  static Future<void> setNotificationBatching(bool enabled, {String reason = 'focus'}) =>
+      MethodChannelService.instance.setNotificationBatching(enabled, reason: reason);
 }
