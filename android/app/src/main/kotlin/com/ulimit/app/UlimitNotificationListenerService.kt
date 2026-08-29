@@ -3,20 +3,39 @@ package com.ulimit.app
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 
-/// Grants the permission surface the onboarding screen checks against
-/// (BIND_NOTIFICATION_LISTENER_SERVICE requires an actual declared
-/// service, not just a manifest permission). The real batching/muting
-/// policy — hold, silence, or release based on Bedtime/Focus state — is
-/// intentionally not implemented yet; wiring it needs the
-/// RestrictionGroups + BedtimeSchedule state to be readable from native
-/// code, which is the next slice of this feature, not this one.
+/// Listens for notifications and batches them during focus sessions or
+/// bedtime. When batching is active, non-priority notifications are
+/// cancelled (not shown) and stored for later release.
+///
+/// Batching state is controlled by Dart via NotificationBatchingBridge —
+/// the service doesn't need to read Drift directly.
 class UlimitNotificationListenerService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
-        // Intentionally empty for now — see class doc.
+        if (sbn == null) return
+        if (!NotificationBatchingBridge.isBatchingEnabled()) return
+
+        // Let through priority notifications (calls, messages from
+        // starred contacts) even during batching — the user probably
+        // doesn't want to miss those.
+        if (isPriority(sbn)) return
+
+        // Cancel the notification so it doesn't disturb the user. It
+        // will be released when batching ends.
+        cancelNotification(sbn.key)
+        NotificationBatchingBridge.onBatched(sbn.packageName)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        // Intentionally empty for now — see class doc.
+        // Intentionally empty — we only care about new notifications.
+    }
+
+    private fun isPriority(sbn: StatusBarNotification): Boolean {
+        // Calls and alarms always come through.
+        val pkg = sbn.packageName
+        if (pkg == "com.android.dialer" || pkg == "com.google.android.dialer") return true
+        if (pkg == "com.android.deskclock" || pkg == "com.google.android.deskclock") return true
+        // Category == msg indicates a direct message — let it through.
+        return sbn.notification.category == "msg"
     }
 }

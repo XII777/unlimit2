@@ -67,4 +67,13 @@ class NativePermissions {
   static Future<bool> authenticateBiometric({String reason = "Verify it's you"}) async {
     return await _channel.invokeMethod<bool>('authenticateBiometric', {'reason': reason}) ?? false;
   }
+
+  /// Enables/disables notification batching. When enabled, the
+  /// NotificationListenerService cancels non-priority notifications.
+  /// [reason] is "focus" or "bedtime" — affects which summary the UI shows.
+  static Future<void> setNotificationBatching(bool enabled, {String reason = "focus"}) =>
+      _channel.invokeMethod('setNotificationBatching', {
+        'enabled': enabled,
+        'reason': reason,
+      });
 }

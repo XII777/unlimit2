@@ -104,6 +104,12 @@ class MainActivity : FlutterActivity() {
                         val reason = call.argument<String>("reason") ?: "Verify it's you"
                         authenticateBiometric(result, reason)
                     }
+                    "setNotificationBatching" -> {
+                        val enabled = call.argument<Boolean>("enabled") ?: false
+                        val reason = call.argument<String>("reason") ?: "focus"
+                        NotificationBatchingBridge.setBatching(enabled, reason)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

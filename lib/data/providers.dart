@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/native/blocklist_channel.dart';
+import '../core/native/permissions_channel.dart';
 import 'db/app_database.dart';
 import 'db/tables.dart';
 
@@ -139,6 +140,16 @@ final activeSessionProvider = StreamProvider<FocusSessions?>((ref) {
     ..where((t) => t.completed.equals(false) & t.endedAt.isNull())
     ..limit(1);
   return query.watchSingleOrNull();
+});
+
+/// Auto-enables notification batching when a focus session is active.
+/// Watches activeSessionProvider and pushes the batching state to the
+/// native NotificationListenerService.
+final notificationBatchingProvider = Provider((ref) {
+  final active = ref.watch(activeSessionProvider).valueOrNull;
+  final isActive = active != null;
+  NativePermissions.setNotificationBatching(isActive, reason: 'focus');
+  return isActive;
 });
 
 /// Focus session actions — start, complete, abandon. Each writes a real
