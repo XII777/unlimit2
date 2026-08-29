@@ -16,7 +16,7 @@ class Initializer {
     final db = DriftDbService.instance.db;
 
     // Sync blocklist to AccessibilityService
-    final blockedApps = await db.select(db.blockedApps).get();
+    final blockedApps = await db.select(db.blockedAppsTable).get();
     final enabled = blockedApps.where((a) => a.enabled).map((a) => a.packageName).toList();
     await MethodChannelService.instance.syncBlocklist(
       enabled,
@@ -24,7 +24,7 @@ class Initializer {
     );
 
     // Sync bedtime DND state
-    final bedtime = await db.select(db.bedtimeSchedule).getSingleOrNull();
+    final bedtime = await db.select(db.bedtimeScheduleTable).getSingleOrNull();
     if (bedtime != null && bedtime.dndEnabled) {
       await MethodChannelService.instance.setDndEnabled(true);
     }

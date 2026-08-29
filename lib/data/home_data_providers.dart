@@ -9,7 +9,7 @@ DateTime _daysAgo(int n) => _startOfDay(DateTime.now().subtract(Duration(days: n
 /// biometric lock setting. Null until first write creates it.
 final profileProvider = StreamProvider((ref) {
   final db = ref.watch(databaseProvider);
-  final query = db.select(db.profile)..limit(1);
+  final query = db.select(db.profileTable)..limit(1);
   return query.watch().map((rows) => rows.isEmpty ? null : rows.first);
 });
 
@@ -18,45 +18,45 @@ final profileProvider = StreamProvider((ref) {
 /// row exists yet — a fresh install still gets a sane ring.
 final dailyBudgetProvider = StreamProvider<int>((ref) {
   final db = ref.watch(databaseProvider);
-  return db.select(db.profile).watchSingleOrNull().map((row) => row?.dailyBudgetMinutes ?? 240);
+  return db.select(db.profileTable).watchSingleOrNull().map((row) => row?.dailyBudgetMinutes ?? 240);
 });
 
 /// Whether biometric lock is enabled for settings changes. Drives the
 /// Parental & Lock screen's toggle and gates enforcement elsewhere.
 final biometricLockProvider = StreamProvider<bool>((ref) {
   final db = ref.watch(databaseProvider);
-  return db.select(db.profile).watchSingleOrNull().map((row) => row?.biometricLockEnabled ?? false);
+  return db.select(db.profileTable).watchSingleOrNull().map((row) => row?.biometricLockEnabled ?? false);
 });
 
 /// Profile actions — update settings with optional biometric gate.
 extension ProfileActions on AppDatabase {
   Future<void> setBiometricLockEnabled(bool value) async {
-    final existing = await (select(profile)..limit(1)).getSingleOrNull();
+    final existing = await (select(profileTable)..limit(1)).getSingleOrNull();
     if (existing == null) {
-      await into(profile).insert(ProfileCompanion.insert(biometricLockEnabled: Value(value)));
+      await into(profileTable).insert(ProfileTableCompanion.insert(biometricLockEnabled: Value(value)));
     } else {
-      await (update(profile)..where((t) => t.id.equals(existing.id)))
-          .write(ProfileCompanion(biometricLockEnabled: Value(value)));
+      await (update(profileTable)..where((t) => t.id.equals(existing.id)))
+          .write(ProfileTableCompanion(biometricLockEnabled: Value(value)));
     }
   }
 
   Future<void> setDailyBudgetMinutes(int minutes) async {
-    final existing = await (select(profile)..limit(1)).getSingleOrNull();
+    final existing = await (select(profileTable)..limit(1)).getSingleOrNull();
     if (existing == null) {
-      await into(profile).insert(ProfileCompanion.insert(dailyBudgetMinutes: Value(minutes)));
+      await into(profileTable).insert(ProfileTableCompanion.insert(dailyBudgetMinutes: Value(minutes)));
     } else {
-      await (update(profile)..where((t) => t.id.equals(existing.id)))
-          .write(ProfileCompanion(dailyBudgetMinutes: Value(minutes)));
+      await (update(profileTable)..where((t) => t.id.equals(existing.id)))
+          .write(ProfileTableCompanion(dailyBudgetMinutes: Value(minutes)));
     }
   }
 
   Future<void> setDisplayName(String name) async {
-    final existing = await (select(profile)..limit(1)).getSingleOrNull();
+    final existing = await (select(profileTable)..limit(1)).getSingleOrNull();
     if (existing == null) {
-      await into(profile).insert(ProfileCompanion.insert(displayName: Value(name)));
+      await into(profileTable).insert(ProfileTableCompanion.insert(displayName: Value(name)));
     } else {
-      await (update(profile)..where((t) => t.id.equals(existing.id)))
-          .write(ProfileCompanion(displayName: Value(name)));
+      await (update(profileTable)..where((t) => t.id.equals(existing.id)))
+          .write(ProfileTableCompanion(displayName: Value(name)));
     }
   }
 }
@@ -67,7 +67,7 @@ final weeklyScreenTimeHoursProvider = StreamProvider<List<double>>((ref) {
   final db = ref.watch(databaseProvider);
   final start = _daysAgo(6);
 
-  final query = db.select(db.appUsage)..where((t) => t.day.isBiggerOrEqualValue(start));
+  final query = db.select(db.appUsageTable)..where((t) => t.day.isBiggerOrEqualValue(start));
 
   return query.watch().map((rows) {
     final byDay = <DateTime, int>{};
@@ -89,7 +89,7 @@ final weeklyFocusHoursByDayProvider = StreamProvider<List<double>>((ref) {
   final db = ref.watch(databaseProvider);
   final start = _daysAgo(6);
 
-  final query = db.select(db.focusSessions)
+  final query = db.select(db.focusSessionsTable)
     ..where((t) => t.startedAt.isBiggerOrEqualValue(start) & t.completed.equals(true));
 
   return query.watch().map((rows) {
@@ -112,7 +112,7 @@ final weeklyFocusSecondsProvider = StreamProvider<int>((ref) {
   final db = ref.watch(databaseProvider);
   final start = _daysAgo(6);
 
-  final query = db.select(db.focusSessions)
+  final query = db.select(db.focusSessionsTable)
     ..where((t) => t.startedAt.isBiggerOrEqualValue(start) & t.completed.equals(true));
 
   return query.watch().map((rows) => rows.fold<int>(0, (sum, s) {
@@ -146,7 +146,7 @@ final previousWeekScreenTimeHoursProvider = StreamProvider<List<double>>((ref) {
   final start = _daysAgo(13);
   final end = _daysAgo(7);
 
-  final query = db.select(db.appUsage)
+  final query = db.select(db.appUsageTable)
     ..where((t) => t.day.isBiggerOrEqualValue(start) & t.day.isSmallerThanValue(end));
 
   return query.watch().map((rows) {
@@ -168,7 +168,7 @@ final previousWeekFocusSecondsProvider = StreamProvider<int>((ref) {
   final start = _daysAgo(13);
   final end = _daysAgo(7);
 
-  final query = db.select(db.focusSessions)
+  final query = db.select(db.focusSessionsTable)
     ..where((t) =>
         t.startedAt.isBiggerOrEqualValue(start) &
         t.startedAt.isSmallerThanValue(end) &
@@ -259,7 +259,7 @@ final currentStreakProvider = StreamProvider<int>((ref) {
   final db = ref.watch(databaseProvider);
   final start = _daysAgo(60); // 60-day lookback is plenty for any realistic streak
 
-  final query = db.select(db.appUsage)..where((t) => t.day.isBiggerOrEqualValue(start));
+  final query = db.select(db.appUsageTable)..where((t) => t.day.isBiggerOrEqualValue(start));
 
   return query.watch().map((rows) {
     final daysWithData = rows.map((r) => r.day).toSet();

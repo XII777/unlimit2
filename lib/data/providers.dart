@@ -24,7 +24,7 @@ final todayScreenTimeProvider = StreamProvider<Duration>((ref) {
   final db = ref.watch(databaseProvider);
   final startOfDay = _startOfDay(DateTime.now());
 
-  final query = db.select(db.appUsage)..where((t) => t.day.equals(startOfDay));
+  final query = db.select(db.appUsageTable)..where((t) => t.day.equals(startOfDay));
 
   return query.watch().map(
         (rows) => Duration(seconds: rows.fold(0, (sum, r) => sum + r.foregroundSeconds)),
@@ -39,7 +39,7 @@ final weeklyScreenTimeProvider = StreamProvider<List<Duration>>((ref) {
   final today = _startOfDay(DateTime.now());
   final start = today.subtract(const Duration(days: 6));
 
-  final query = db.select(db.appUsage)..where((t) => t.day.isBiggerOrEqualValue(start));
+  final query = db.select(db.appUsageTable)..where((t) => t.day.isBiggerOrEqualValue(start));
 
   return query.watch().map((rows) => _bucketByDay(rows.map((r) => (r.day, r.foregroundSeconds)), start));
 });
@@ -53,7 +53,7 @@ final previousWeekScreenTimeAvgProvider = StreamProvider<Duration>((ref) {
   final start = today.subtract(const Duration(days: 13));
   final end = today.subtract(const Duration(days: 6));
 
-  final query = db.select(db.appUsage)
+  final query = db.select(db.appUsageTable)
     ..where((t) => t.day.isBiggerOrEqualValue(start) & t.day.isSmallerThanValue(end));
 
   return query.watch().map((rows) {
@@ -70,7 +70,7 @@ final weeklyFocusTimeProvider = StreamProvider<List<Duration>>((ref) {
   final today = _startOfDay(DateTime.now());
   final start = today.subtract(const Duration(days: 6));
 
-  final query = db.select(db.focusSessions)
+  final query = db.select(db.focusSessionsTable)
     ..where((t) => t.completed.equals(true) & t.startedAt.isBiggerOrEqualValue(start));
 
   return query.watch().map((rows) {
@@ -89,7 +89,7 @@ final previousWeekFocusTimeAvgProvider = StreamProvider<Duration>((ref) {
   final start = today.subtract(const Duration(days: 13));
   final end = today.subtract(const Duration(days: 6));
 
-  final query = db.select(db.focusSessions)
+  final query = db.select(db.focusSessionsTable)
     ..where((t) =>
         t.completed.equals(true) & t.startedAt.isBiggerOrEqualValue(start) & t.startedAt.isSmallerThanValue(end));
 
@@ -109,7 +109,7 @@ final todaysCompletedSessionsProvider = StreamProvider<int>((ref) {
   final start = _startOfDay(DateTime.now());
   final end = start.add(const Duration(days: 1));
 
-  final query = db.select(db.focusSessions)
+  final query = db.select(db.focusSessionsTable)
     ..where((t) =>
         t.completed.equals(true) & t.startedAt.isBiggerOrEqualValue(start) & t.startedAt.isSmallerThanValue(end));
 
@@ -123,7 +123,7 @@ final todaysSessionsProvider = StreamProvider((ref) {
   final start = _startOfDay(DateTime.now());
   final end = start.add(const Duration(days: 1));
 
-  final query = db.select(db.focusSessions)
+  final query = db.select(db.focusSessionsTable)
     ..where((t) =>
         t.completed.equals(true) & t.startedAt.isBiggerOrEqualValue(start) & t.startedAt.isSmallerThanValue(end))
     ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]);
@@ -135,7 +135,7 @@ final todaysSessionsProvider = StreamProvider((ref) {
 /// Focus screen's ring from a real DB row instead of local state.
 final activeSessionProvider = StreamProvider((ref) {
   final db = ref.watch(databaseProvider);
-  final query = db.select(db.focusSessions)
+  final query = db.select(db.focusSessionsTable)
     ..where((t) => t.completed.equals(false) & t.endedAt.isNull())
     ..limit(1);
   return query.watchSingleOrNull();
@@ -159,7 +159,7 @@ extension FocusSessionActions on AppDatabase {
     required int plannedSeconds,
     bool invincible = false,
   }) async {
-    await into(focusSessions).insert(FocusSessionsCompanion.insert(
+    await into(focusSessionsTable).insert(FocusSessionsTableCompanion.insert(
       label: label,
       startedAt: DateTime.now(),
       plannedSeconds: plannedSeconds,
@@ -168,26 +168,26 @@ extension FocusSessionActions on AppDatabase {
   }
 
   Future<void> completeActiveSession() async {
-    final active = await (select(focusSessions)
+    final active = await (select(focusSessionsTable)
           ..where((t) => t.completed.equals(false) & t.endedAt.isNull())
           ..limit(1))
         .getSingleOrNull();
     if (active == null) return;
-    await (update(focusSessions)..where((t) => t.id.equals(active.id)))
-        .write(FocusSessionsCompanion(
+    await (update(focusSessionsTable)..where((t) => t.id.equals(active.id)))
+        .write(FocusSessionsTableCompanion(
           endedAt: Value(DateTime.now()),
           completed: const Value(true),
         ));
   }
 
   Future<void> abandonActiveSession() async {
-    final active = await (select(focusSessions)
+    final active = await (select(focusSessionsTable)
           ..where((t) => t.completed.equals(false) & t.endedAt.isNull())
           ..limit(1))
         .getSingleOrNull();
     if (active == null) return;
-    await (update(focusSessions)..where((t) => t.id.equals(active.id)))
-        .write(FocusSessionsCompanion(
+    await (update(focusSessionsTable)..where((t) => t.id.equals(active.id)))
+        .write(FocusSessionsTableCompanion(
           endedAt: Value(DateTime.now()),
           completed: const Value(false),
         ));
@@ -202,7 +202,7 @@ extension RestrictionActions on AppDatabase {
     required int dailyLimitSeconds,
     bool invincible = false,
   }) async {
-    await into(restrictionGroups).insert(RestrictionGroupsCompanion.insert(
+    await into(restrictionGroupsTable).insert(RestrictionGroupsTableCompanion.insert(
       name: name,
       dailyLimitSeconds: dailyLimitSeconds,
       invincible: Value(invincible),
@@ -215,8 +215,8 @@ extension RestrictionActions on AppDatabase {
     int? dailyLimitSeconds,
     bool? invincible,
   }) async {
-    await (update(restrictionGroups)..where((t) => t.id.equals(id)))
-        .write(RestrictionGroupsCompanion(
+    await (update(restrictionGroupsTable)..where((t) => t.id.equals(id)))
+        .write(RestrictionGroupsTableCompanion(
       name: name != null ? Value(name) : const Value.absent(),
       dailyLimitSeconds: dailyLimitSeconds != null ? Value(dailyLimitSeconds) : const Value.absent(),
       invincible: invincible != null ? Value(invincible) : const Value.absent(),
@@ -224,19 +224,19 @@ extension RestrictionActions on AppDatabase {
   }
 
   Future<void> deleteRestrictionGroup(int id) async {
-    await (delete(restrictionGroupApps)..where((t) => t.groupId.equals(id))).go();
-    await (delete(restrictionGroups)..where((t) => t.id.equals(id))).go();
+    await (delete(restrictionGroupAppsTable)..where((t) => t.groupId.equals(id))).go();
+    await (delete(restrictionGroupsTable)..where((t) => t.id.equals(id))).go();
   }
 
   Future<void> addAppToGroup(int groupId, String packageName) async {
-    await into(restrictionGroupApps).insert(
-      RestrictionGroupAppsCompanion.insert(groupId: groupId, packageName: packageName),
+    await into(restrictionGroupAppsTable).insert(
+      RestrictionGroupAppsTableCompanion.insert(groupId: groupId, packageName: packageName),
       mode: InsertMode.insertOrIgnore,
     );
   }
 
   Future<void> removeAppFromGroup(int groupId, String packageName) async {
-    await (delete(restrictionGroupApps)
+    await (delete(restrictionGroupAppsTable)
           ..where((t) => t.groupId.equals(groupId) & t.packageName.equals(packageName)))
         .go();
   }
@@ -246,8 +246,8 @@ extension RestrictionActions on AppDatabase {
     String? scheduleStart,
     String? scheduleEnd,
   }) async {
-    await into(blockedApps).insert(
-      BlockedAppsCompanion.insert(
+    await into(blockedAppsTable).insert(
+      BlockedAppsTableCompanion.insert(
         packageName: packageName,
         scheduleStart: Value(scheduleStart),
         scheduleEnd: Value(scheduleEnd),
@@ -257,12 +257,12 @@ extension RestrictionActions on AppDatabase {
   }
 
   Future<void> setBlockedAppEnabled(String packageName, bool enabled) async {
-    await (update(blockedApps)..where((t) => t.packageName.equals(packageName)))
-        .write(BlockedAppsCompanion(enabled: Value(enabled)));
+    await (update(blockedAppsTable)..where((t) => t.packageName.equals(packageName)))
+        .write(BlockedAppsTableCompanion(enabled: Value(enabled)));
   }
 
   Future<void> removeBlockedApp(String packageName) async {
-    await (delete(blockedApps)..where((t) => t.packageName.equals(packageName))).go();
+    await (delete(blockedAppsTable)..where((t) => t.packageName.equals(packageName))).go();
   }
 }
 
@@ -317,7 +317,7 @@ final restrictionGroupsProvider = StreamProvider<List<RestrictionGroupView>>((re
     ORDER BY rg.id
     ''',
     variables: [Variable.withDateTime(today)],
-    readsFrom: {db.restrictionGroups, db.restrictionGroupApps, db.appUsage},
+    readsFrom: {db.restrictionGroupsTable, db.restrictionGroupAppsTable, db.appUsageTable},
   );
 
   return query.watch().map((rows) {
@@ -367,7 +367,7 @@ class _MutableGroup {
 /// control tile's subtitle on Home.
 final blockedAppsCountProvider = StreamProvider<int>((ref) {
   final db = ref.watch(databaseProvider);
-  final query = db.select(db.blockedApps)..where((t) => t.enabled.equals(true));
+  final query = db.select(db.blockedAppsTable)..where((t) => t.enabled.equals(true));
   return query.watch().map((rows) => rows.length);
 });
 
@@ -375,7 +375,7 @@ final blockedAppsCountProvider = StreamProvider<int>((ref) {
 /// Apps management UI.
 final blockedAppsProvider = StreamProvider((ref) {
   final db = ref.watch(databaseProvider);
-  final query = db.select(db.blockedApps)..orderBy([(t) => OrderingTerm.asc(t.packageName)]);
+  final query = db.select(db.blockedAppsTable)..orderBy([(t) => OrderingTerm.asc(t.packageName)]);
   return query.watch();
 });
 
@@ -402,7 +402,7 @@ final emergencyUnlocksSyncProvider = Provider((ref) {
       final pkg = u['package'] as String?;
       final ts = u['timestamp'] as int?;
       if (pkg == null || ts == null) continue;
-      await db.into(db.emergencyUnlocks).insert(EmergencyUnlocksCompanion.insert(
+      await db.into(db.emergencyUnlocksTable).insert(EmergencyUnlocksTableCompanion.insert(
         usedAt: DateTime.fromMillisecondsSinceEpoch(ts),
         packageName: pkg,
         grantedSeconds: 300, // 5-minute emergency window
@@ -447,32 +447,32 @@ Future<List<InstalledApp>> _fetchInstalledApps() async {
 /// until the first toggle write creates it.
 final bedtimeScheduleProvider = StreamProvider<BedtimeScheduleData?>((ref) {
   final db = ref.watch(databaseProvider);
-  final query = db.select(db.bedtimeSchedule)..limit(1);
+  final query = db.select(db.bedtimeScheduleTable)..limit(1);
   return query.watch().map((rows) => rows.isEmpty ? null : rows.first);
 });
 
 extension BedtimeScheduleActions on AppDatabase {
   Future<void> _ensureBedtimeRow() async {
-    final existing = await (select(bedtimeSchedule)..limit(1)).getSingleOrNull();
+    final existing = await (select(bedtimeScheduleTable)..limit(1)).getSingleOrNull();
     if (existing == null) {
-      await into(bedtimeSchedule).insert(
-        BedtimeScheduleCompanion.insert(startTime: '22:30', endTime: '06:30'),
+      await into(bedtimeScheduleTable).insert(
+        BedtimeScheduleTableCompanion.insert(startTime: '22:30', endTime: '06:30'),
       );
     }
   }
 
   Future<void> setDndEnabled(bool value) async {
     await _ensureBedtimeRow();
-    await update(bedtimeSchedule).write(BedtimeScheduleCompanion(dndEnabled: Value(value)));
+    await update(bedtimeScheduleTable).write(BedtimeScheduleTableCompanion(dndEnabled: Value(value)));
   }
 
   Future<void> setPauseApps(bool value) async {
     await _ensureBedtimeRow();
-    await update(bedtimeSchedule).write(BedtimeScheduleCompanion(pauseApps: Value(value)));
+    await update(bedtimeScheduleTable).write(BedtimeScheduleTableCompanion(pauseApps: Value(value)));
   }
 
   Future<void> setGrayscale(bool value) async {
     await _ensureBedtimeRow();
-    await update(bedtimeSchedule).write(BedtimeScheduleCompanion(grayscale: Value(value)));
+    await update(bedtimeScheduleTable).write(BedtimeScheduleTableCompanion(grayscale: Value(value)));
   }
 }
