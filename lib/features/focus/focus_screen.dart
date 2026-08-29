@@ -1,52 +1,55 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/tokens.dart';
+import '../../data/providers.dart';
 import '../../shared/widgets/limit_ring.dart';
 
-class FocusScreen extends StatefulWidget {
+class FocusScreen extends ConsumerStatefulWidget {
   const FocusScreen({super.key});
 
   @override
-  State<FocusScreen> createState() => _FocusScreenState();
+  ConsumerState<FocusScreen> createState() => _FocusScreenState();
 }
 
-class _FocusScreenState extends State<FocusScreen> {
-  static const _total = Duration(minutes: 25);
-  Duration _remaining = _total;
+class _FocusScreenState extends ConsumerState<FocusScreen> {
+  static const _totalPlanned = Duration(minutes: 25);
+  Duration _remaining = _totalPlanned;
   Timer? _ticker;
-
-  // Placeholder — swap for a real todaysSessionsProvider (Drift query on
-  // FocusSessions where startedAt is today) once that lands. Matches the
-  // 3-dot pattern in the design: completed sessions filled, the current
-  // one shown as an accent-to-calm gradient chip, empty slots as tracks.
-  static const _completedSessions = 2;
+  bool _sessionActive = false;
 
   @override
   void initState() {
     super.initState();
-    // A 1-second periodic timer is cheap — the ring's own repaint is
-    // gated by shouldRepaint, so this doesn't cost more than one
-    // CustomPainter.paint() per second, not per frame.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (_remaining.inSeconds <= 0) {
-        _ticker?.cancel();
-        return;
-      }
+      if (!_sessionActive || _remaining.inSeconds <= 0) return;
       setState(() => _remaining -= const Duration(seconds: 1));
+      if (_remaining.inSeconds <= 0) {
+        _sessionActive = false;
+        _ticker?.cancel();
+      }
     });
   }
 
   @override
   void dispose() {
-    _ticker?.cancel(); // leaking this timer is the #1 cause of
-    // "why does my app get slower the longer it's open" bug reports
+    _ticker?.cancel();
     super.dispose();
+  }
+
+  void _startSession() {
+    setState(() {
+      _sessionActive = true;
+      _remaining = _totalPlanned;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final progress = 1 - (_remaining.inSeconds / _total.inSeconds);
+    final todaysSessions = ref.watch(todaysSessionsProvider);
+    final completedCount = todaysSessions.valueOrNull?.length ?? 0;
+    final progress = _sessionActive ? 1 - (_remaining.inSeconds / _totalPlanned.inSeconds) : 0.0;
 
     return Container(
       decoration: const BoxDecoration(
@@ -75,28 +78,32 @@ class _FocusScreenState extends State<FocusScreen> {
                     color: AppColors.ink,
                   )),
                   const SizedBox(height: 6),
-                  Text('Deep Work · remaining', style: Theme.of(context).textTheme.bodySmall),
+                  Text(_sessionActive ? 'Deep Work · remaining' : 'Ready to focus',
+                      style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
             const SizedBox(height: 20),
             const _LockNote(),
             const Spacer(),
-            const _TodaysSessions(completed: _completedSessions, total: 3),
+            _TodaysSessions(completed: completedCount),
             const SizedBox(height: 20),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () => _confirmEndEarly(context),
+                  onPressed: _sessionActive ? () => _confirmEndEarly(context) : _startSession,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.all(14),
                     backgroundColor: AppColors.surface2,
                     side: const BorderSide(color: AppColors.stroke),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                   ),
-                  child: const Text('End session early', style: TextStyle(color: AppColors.inkDim)),
+                  child: Text(
+                    _sessionActive ? 'End session early' : 'Start session',
+                    style: const TextStyle(color: AppColors.inkDim),
+                  ),
                 ),
               ),
             ),
@@ -145,9 +152,6 @@ class _InvincibleChip extends StatelessWidget {
   }
 }
 
-/// "12 apps paused · DND on" — reinforces what invincible mode is
-/// actually doing while the ring runs, so the state isn't only
-/// communicated once at the top of the screen.
 class _LockNote extends StatelessWidget {
   const _LockNote();
 
@@ -164,13 +168,15 @@ class _LockNote extends StatelessWidget {
   }
 }
 
-class _TodaysSessions extends StatelessWidget {
-  const _TodaysSessions({required this.completed, this.total = 3});
+class _TodaysSessions extends ConsumerWidget {
+  const _TodaysSessions({required this.completed});
   final int completed;
-  final int total;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessions = ref.watch(todaysSessionsProvider);
+    final total = 3; // planned sessions per day
+
     return Column(
       children: [
         Text(

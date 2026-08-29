@@ -35,12 +35,6 @@ class MorphPage<T> extends PageRouteBuilder<T> {
   final Widget child;
 }
 
-/// For bottom-nav tab switches specifically: no fade-through-black,
-/// just a fast cross-dissolve so tapping Home→Focus→Limits feels
-/// instant, not like navigating "into" a new page.
-Widget tabMorph(Widget child, Animation<double> animation) {
-  return FadeTransition(
-    opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-    child: child,
-  );
-}
+/// For bottom-nav tab switches: no transition — instant swap so
+/// tapping Home→Focus→Limits feels immediate.
+Widget tabMorph(Widget child, Animation<double> animation) => child;

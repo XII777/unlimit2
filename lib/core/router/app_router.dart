@@ -23,12 +23,12 @@ abstract final class Routes {
 final appRouter = GoRouter(
   initialLocation: Routes.home,
   routes: [
-    // ShellRoute keeps the floating nav bar mounted across tab switches
-    // instead of rebuilding it (and its icons/animations) on every nav —
-    // this is the single biggest jank source in bottom-nav apps that get
-    // it wrong.
+    // ShellRoute keeps the floating nav bar mounted across tab switches.
+    // NavShell owns its own PageView of tab screens, so the ShellRoute's
+    // `child` is ignored — routes below exist for path matching and
+    // deep-linking only.
     ShellRoute(
-      builder: (context, state, child) => NavShell(child: child),
+      builder: (context, state, child) => const NavShell(),
       routes: [
         GoRoute(
           path: Routes.home,
@@ -85,26 +85,7 @@ final appRouter = GoRouter(
       pageBuilder: (context, state) => CustomTransitionPage(
         key: state.pageKey,
         child: const ParentalScreen(),
-        transitionDuration: const Duration(milliseconds: 260),
-        reverseTransitionDuration: const Duration(milliseconds: 200),
-        // Same fade+scale curve as MorphPage (see morph_transition.dart) —
-        // duplicated inline rather than reused because MorphPage is a
-        // PageRouteBuilder for imperative Navigator.push, not a go_router
-        // Page; CustomTransitionPage is go_router's equivalent shape.
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: ScaleTransition(
-              scale: Tween(begin: 0.97, end: 1.0).animate(curved),
-              child: child,
-            ),
-          );
-        },
+        transitionsBuilder: (_, __, ___, child) => child,
       ),
     ),
   ],

@@ -115,6 +115,21 @@ final todaysCompletedSessionsProvider = StreamProvider<int>((ref) {
   return query.watch().map((rows) => rows.length);
 });
 
+/// Today's completed focus sessions as a live list — drives the Focus
+/// screen's session dots from real data instead of a hardcoded count.
+final todaysSessionsProvider = StreamProvider<List<FocusSessionsData>>((ref) {
+  final db = ref.watch(databaseProvider);
+  final start = _startOfDay(DateTime.now());
+  final end = start.add(const Duration(days: 1));
+
+  final query = db.select(db.focusSessions)
+    ..where((t) =>
+        t.completed.equals(true) & t.startedAt.isBiggerOrEqualValue(start) & t.startedAt.isSmallerThanValue(end))
+    ..orderBy([(t) => OrderingTerm.desc(t.startedAt)]);
+
+  return query.watch();
+});
+
 /// Turns a stream of (day, seconds) rows into a fixed 7-slot list
 /// starting at [start], zero-filling any day with no rows. Shared by
 /// both weekly providers above so "bucket into a 7-day window" is
