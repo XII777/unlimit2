@@ -46,7 +46,8 @@ class _FocusScreenState extends ConsumerState<FocusScreen> {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final sessions = ref.watch(todaysSessionsProvider);
     final completedCount = sessions.valueOrNull?.length ?? 0;
     final progress = _sessionActive ? 1 - (_remaining.inSeconds / _totalPlanned.inSeconds) : 0.0;
