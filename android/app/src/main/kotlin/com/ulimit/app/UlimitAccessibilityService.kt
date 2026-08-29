@@ -1,6 +1,7 @@
 package com.ulimit.app
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 
 /// The actual data source behind every usage number in the app. Fires
@@ -8,12 +9,9 @@ import android.view.accessibility.AccessibilityEvent
 /// (or a different screen within one) is now in front"), and forwards
 /// the package name + timestamp to Dart via [UsageEventBridge].
 ///
-/// Deliberately thin: all the actual logic (attributing elapsed time,
-/// writing to the DB, detecting pickups, deciding when to show the
-/// blocking overlay) lives in Dart (UsageTracker) rather than here.
-/// Keeping the native side to "detect and forward" means the
-/// enforcement logic is testable and iterable in Dart without a
-/// Gradle rebuild for every tweak.
+/// Also enforces app blocking: when a blocked app comes to the foreground,
+/// it launches the BlockOverlayActivity to prevent access. The list of
+/// blocked packages is read from the Drift DB via [BlocklistBridge].
 class UlimitAccessibilityService : AccessibilityService() {
 
     private var lastPackageName: String? = null
@@ -30,12 +28,24 @@ class UlimitAccessibilityService : AccessibilityService() {
         if (packageName == lastPackageName) return
 
         lastPackageName = packageName
+
+        // Enforcement: if this package is blocked, show the overlay
+        // instead of letting the user through. BlocklistBridge caches
+        // the blocked set — updated by Dart via MethodChannel.
+        if (BlocklistBridge.shouldBlock(packageName)) {
+            val intent = Intent(this, BlockOverlayActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                putExtra("blocked_package", packageName)
+            }
+            startActivity(intent)
+            return
+        }
+
         UsageEventBridge.emit(packageName, System.currentTimeMillis())
     }
 
     override fun onInterrupt() {
-        // Required override; nothing to clean up — no ongoing async work
-        // is held directly by this service.
+        // Required override; nothing to clean up.
     }
 
     override fun onServiceConnected() {

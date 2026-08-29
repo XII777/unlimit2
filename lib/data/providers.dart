@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/native/blocklist_channel.dart';
 import 'db/app_database.dart';
 import 'db/tables.dart';
 
@@ -366,6 +367,39 @@ final blockedAppsProvider = StreamProvider<List<BlockedAppsData>>((ref) {
   final db = ref.watch(databaseProvider);
   final query = db.select(db.blockedApps)..orderBy([(t) => OrderingTerm.asc(t.packageName)]);
   return query.watch();
+});
+
+/// Auto-syncs the blocked-apps list to the native AccessibilityService
+/// whenever it changes. The service reads this cached set on every
+/// foreground-app transition to decide whether to show the block overlay.
+final blocklistSyncProvider = Provider((ref) {
+  final apps = ref.watch(blockedAppsProvider);
+  final data = apps.valueOrNull;
+  if (data != null) {
+    final enabled = data.where((a) => a.enabled).map((a) => a.packageName).toList();
+    NativeBlocklist.syncBlocklist(enabled, data.any((a) => a.enabled));
+  });
+  return data;
+});
+
+/// Drains emergency unlocks from native and writes them to the DB. Polled
+/// periodically while the app is in the foreground.
+final emergencyUnlocksSyncProvider = Provider((ref) {
+  Future.microtask(() async {
+    final unlocks = await NativeBlocklist.drainEmergencyUnlocks();
+    final db = ref.read(databaseProvider);
+    for (final u in unlocks) {
+      final pkg = u['package'] as String?;
+      final ts = u['timestamp'] as int?;
+      if (pkg == null || ts == null) continue;
+      await db.into(db.emergencyUnlocks).insert(EmergencyUnlocksCompanion.insert(
+        usedAt: DateTime.fromMillisecondsSinceEpoch(ts),
+        packageName: pkg,
+        grantedSeconds: 300, // 5-minute emergency window
+      ));
+    }
+  });
+  return null;
 });
 
 /// All installed apps that aren't already in a given restriction group —

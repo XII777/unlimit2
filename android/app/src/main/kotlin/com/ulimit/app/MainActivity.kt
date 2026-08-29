@@ -72,6 +72,25 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "isBiometricAvailable" -> result.success(isBiometricAvailable())
+                    "updateBlocklist" -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val packages = call.argument<List<String>>("packages") ?: emptyList()
+                        val enabled = call.argument<Boolean>("enabled") ?: false
+                        BlocklistBridge.updateBlocked(packages, enabled)
+                        result.success(null)
+                    }
+                    "drainEmergencyUnlocks" -> {
+                        result.success(EmergencyUnlockBridge.drainUnlocks())
+                    }
+                    "showBlockOverlay" -> {
+                        val pkg = call.argument<String>("packageName") ?: ""
+                        val intent = Intent(this, BlockOverlayActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            putExtra("blocked_package", pkg)
+                        }
+                        startActivity(intent)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
