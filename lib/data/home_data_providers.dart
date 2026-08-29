@@ -5,6 +5,14 @@ import 'providers.dart';
 DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
 DateTime _daysAgo(int n) => _startOfDay(DateTime.now().subtract(Duration(days: n)));
 
+/// The singleton Profile row — display name, photo, theme, budget, and
+/// biometric lock setting. Null until first write creates it.
+final profileProvider = StreamProvider<ProfileData?>((ref) {
+  final db = ref.watch(databaseProvider);
+  final query = db.select(db.profile)..limit(1);
+  return query.watch().map((rows) => rows.isEmpty ? null : rows.first);
+});
+
 /// The user's configured daily budget, in minutes. Falls back to the
 /// schema default (240) via Drift's own default value if no Profile
 /// row exists yet — a fresh install still gets a sane ring.
