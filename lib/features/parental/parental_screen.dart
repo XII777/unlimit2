@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/native/permissions_channel.dart';
 import '../../data/permissions_providers.dart';
+import '../../data/home_data_providers.dart';
 
 class ParentalScreen extends ConsumerStatefulWidget {
   const ParentalScreen({super.key});
@@ -34,6 +35,30 @@ class _ParentalScreenState extends ConsumerState<ParentalScreen> with WidgetsBin
     }
   }
 
+  Future<void> _toggleBiometricLock(BuildContext context, bool enable, bool available) async {
+    if (!available) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Biometric authentication not available on this device'),
+      ));
+      return;
+    }
+    // When enabling, verify the user can actually authenticate before
+    // turning the lock on — otherwise they could lock themselves out.
+    if (enable) {
+      final authenticated = await NativePermissions.authenticateBiometric(
+        reason: 'Verify to enable biometric lock',
+      );
+      if (!authenticated) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Authentication failed — biometric lock not enabled'),
+        ));
+        return;
+      }
+    }
+    final db = ref.read(databaseProvider);
+    await db.setBiometricLockEnabled(enable);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Reads the *real* native state directly, not the onboarding
@@ -41,6 +66,8 @@ class _ParentalScreenState extends ConsumerState<ParentalScreen> with WidgetsBin
     // actually gets turned on for real, so it should never lie about
     // whether it's genuinely active.
     final deviceAdminActive = ref.watch(deviceAdminActiveProvider);
+    final biometricAvailable = ref.watch(biometricAvailableProvider);
+    final biometricLock = ref.watch(biometricLockProvider);
 
     return SafeArea(
       child: ListView(
@@ -96,11 +123,39 @@ class _ParentalScreenState extends ConsumerState<ParentalScreen> with WidgetsBin
                   error: (_, __) => const _DeviceAdminRow(active: false),
                 ),
                 const Divider(height: 1, color: AppColors.stroke),
-                _ToggleRow(
-                  label: 'Require biometric to edit',
-                  sublabel: 'Face unlock or fingerprint',
-                  value: false,
-                  onChanged: (_) {}, // wire to a real settings row once biometric-lock is built
+                biometricAvailable.when(
+                  data: (available) => biometricLock.when(
+                    data: (enabled) => _ToggleRow(
+                      label: 'Require biometric to edit',
+                      sublabel: 'Face unlock or fingerprint',
+                      value: enabled,
+                      onChanged: (v) => _toggleBiometricLock(context, v, available),
+                    ),
+                    loading: () => const _ToggleRow(
+                      label: 'Require biometric to edit',
+                      sublabel: 'Loading…',
+                      value: false,
+                      onChanged: (_) {},
+                    ),
+                    error: (_, __) => const _ToggleRow(
+                      label: 'Require biometric to edit',
+                      sublabel: 'Error loading',
+                      value: false,
+                      onChanged: (_) {},
+                    ),
+                  ),
+                  loading: () => const _ToggleRow(
+                    label: 'Require biometric to edit',
+                    sublabel: 'Checking availability…',
+                    value: false,
+                    onChanged: (_) {},
+                  ),
+                  error: (_, __) => const _ToggleRow(
+                    label: 'Require biometric to edit',
+                    sublabel: 'Not available',
+                    value: false,
+                    onChanged: (_) {},
+                  ),
                 ),
               ],
             ),

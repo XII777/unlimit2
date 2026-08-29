@@ -61,4 +61,10 @@ class NativePermissions {
   static Future<bool> isDndEnabled() async {
     return await _channel.invokeMethod<bool>('isDndEnabled') ?? false;
   }
+
+  /// Shows the system biometric prompt. Returns true if the user
+  /// authenticates successfully. Used to gate parental-control changes.
+  static Future<bool> authenticateBiometric({String reason = "Verify it's you"}) async {
+    return await _channel.invokeMethod<bool>('authenticateBiometric', {'reason': reason}) ?? false;
+  }
 }

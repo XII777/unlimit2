@@ -23,14 +23,18 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
-  // Migrations start here once schemaVersion > 1. Left explicit (rather
-  // than "just delete and recreate") because this is local user data —
-  // wiping someone's focus history on an app update is not acceptable.
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            // v1→v2: add biometric_lock_enabled column to profile.
+            // Default false (no lock) so existing users aren't locked out.
+            await m.addColumn(profile, profile.biometricLockEnabled);
+          }
+        },
       );
 }
 

@@ -13,6 +13,46 @@ final dailyBudgetProvider = StreamProvider<int>((ref) {
   return db.select(db.profile).watchSingleOrNull().map((row) => row?.dailyBudgetMinutes ?? 240);
 });
 
+/// Whether biometric lock is enabled for settings changes. Drives the
+/// Parental & Lock screen's toggle and gates enforcement elsewhere.
+final biometricLockProvider = StreamProvider<bool>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.select(db.profile).watchSingleOrNull().map((row) => row?.biometricLockEnabled ?? false);
+});
+
+/// Profile actions — update settings with optional biometric gate.
+extension ProfileActions on AppDatabase {
+  Future<void> setBiometricLockEnabled(bool value) async {
+    final existing = await (select(profile)..limit(1)).getSingleOrNull();
+    if (existing == null) {
+      await into(profile).insert(ProfileCompanion.insert(biometricLockEnabled: Value(value)));
+    } else {
+      await (update(profile)..where((t) => t.id.equals(existing.id)))
+          .write(ProfileCompanion(biometricLockEnabled: Value(value)));
+    }
+  }
+
+  Future<void> setDailyBudgetMinutes(int minutes) async {
+    final existing = await (select(profile)..limit(1)).getSingleOrNull();
+    if (existing == null) {
+      await into(profile).insert(ProfileCompanion.insert(dailyBudgetMinutes: Value(minutes)));
+    } else {
+      await (update(profile)..where((t) => t.id.equals(existing.id)))
+          .write(ProfileCompanion(dailyBudgetMinutes: Value(minutes)));
+    }
+  }
+
+  Future<void> setDisplayName(String name) async {
+    final existing = await (select(profile)..limit(1)).getSingleOrNull();
+    if (existing == null) {
+      await into(profile).insert(ProfileCompanion.insert(displayName: Value(name)));
+    } else {
+      await (update(profile)..where((t) => t.id.equals(existing.id)))
+          .write(ProfileCompanion(displayName: Value(name)));
+    }
+  }
+}
+
 /// Last 7 days of total screen time, oldest→newest, in hours — feeds
 /// the weekly trend chart directly. Real query, not a fixture array.
 final weeklyScreenTimeHoursProvider = StreamProvider<List<double>>((ref) {

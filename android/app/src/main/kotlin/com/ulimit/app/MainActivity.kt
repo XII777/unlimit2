@@ -100,6 +100,10 @@ class MainActivity : FlutterActivity() {
                         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                         result.success(nm.currentInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL)
                     }
+                    "authenticateBiometric" -> {
+                        val reason = call.argument<String>("reason") ?: "Verify it's you"
+                        authenticateBiometric(result, reason)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -181,5 +185,33 @@ class MainActivity : FlutterActivity() {
             NotificationManager.INTERRUPTION_FILTER_ALL
         }
         return true
+    }
+
+    /// Shows the system biometric prompt. Returns success/failure via
+    /// the MethodChannel result. Used by Parental & Lock to gate settings
+    /// changes behind biometric verification.
+    private fun authenticateBiometric(result: MethodChannel.Result, reason: String) {
+        if (this !is FragmentActivity) {
+            result.success(false)
+            return
+        }
+        val executor = ContextCompat.getMainExecutor(this)
+        val prompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(res: BiometricPrompt.AuthenticationResult) {
+                result.success(true)
+            }
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                result.success(false)
+            }
+            override fun onAuthenticationFailed() {
+                // Don't complete yet — let the user retry.
+            }
+        })
+        val info = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Ulimit")
+            .setSubtitle(reason)
+            .setNegativeButtonText("Cancel")
+            .build()
+        prompt.authenticate(info)
     }
 }

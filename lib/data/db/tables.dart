@@ -12,6 +12,10 @@ class Profile extends Table {
   // defaults to 4h for a fresh install so the ring has something
   // meaningful to show before the user sets their own number.
   IntColumn get dailyBudgetMinutes => integer().withDefault(const Constant(240))();
+  // When true, any change to restriction groups, blocked apps, or bedtime
+  // settings requires biometric verification first. Stored on the
+  // singleton Profile row so it survives app restarts.
+  BoolColumn get biometricLockEnabled => boolean().withDefault(const Constant(false))();
 }
 
 class FocusSessions extends Table {
