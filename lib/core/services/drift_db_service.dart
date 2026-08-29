@@ -26,7 +26,7 @@ class DriftDbService {
   }
 
   Future<AppDatabase> _createDatabase() async {
-    return AppDatabase(LazyDatabase(() async {
+    return AppDatabase.withExecutor(LazyDatabase(() async {
       final dir = await getApplicationDocumentsDirectory();
       final file = File(p.join(dir.path, 'ulimit.sqlite'));
 
